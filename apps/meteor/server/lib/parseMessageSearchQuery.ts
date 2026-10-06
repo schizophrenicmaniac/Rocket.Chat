@@ -166,12 +166,18 @@ class MessageSearchQueryParser {
 	}
 
 	/**
+	 * Midnight of the given calendar day in the user's timezone, regardless of the server's timezone.
+	 */
+	private getUserStartOfDay(year: number, month: number, day: number) {
+		return new Date(Date.UTC(year, month - 1, day) - (this.user?.utcOffset ?? 0) * 3600000);
+	}
+
+	/**
 	 * Filter on messages that have been sent before a date.
 	 */
 	private consumeBefore(text: string) {
 		return text.replace(/before:(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/g, (_: string, day: string, month: string, year: string) => {
-			const beforeDate = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
-			beforeDate.setUTCHours(beforeDate.getUTCHours() + beforeDate.getTimezoneOffset() / 60 + (this.user?.utcOffset ?? 0));
+			const beforeDate = this.getUserStartOfDay(parseInt(year, 10), parseInt(month, 10), parseInt(day, 10));
 
 			this.query.ts = {
 				...this.query.ts,
@@ -187,8 +193,7 @@ class MessageSearchQueryParser {
 	 */
 	private consumeAfter(text: string) {
 		return text.replace(/after:(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/g, (_: string, day: string, month: string, year: string) => {
-			const afterDate = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10) + 1);
-			afterDate.setUTCHours(afterDate.getUTCHours() + afterDate.getTimezoneOffset() / 60 + (this.user?.utcOffset ?? 0));
+			const afterDate = this.getUserStartOfDay(parseInt(year, 10), parseInt(month, 10), parseInt(day, 10) + 1);
 
 			this.query.ts = {
 				...this.query.ts,
@@ -204,10 +209,8 @@ class MessageSearchQueryParser {
 	 */
 	private consumeOn(text: string) {
 		return text.replace(/on:(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/g, (_: string, day: string, month: string, year: string) => {
-			const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
-			date.setUTCHours(date.getUTCHours() + date.getTimezoneOffset() / 60 + (this.user?.utcOffset ?? 0));
-			const dayAfter = new Date(date);
-			dayAfter.setDate(dayAfter.getDate() + 1);
+			const date = this.getUserStartOfDay(parseInt(year, 10), parseInt(month, 10), parseInt(day, 10));
+			const dayAfter = this.getUserStartOfDay(parseInt(year, 10), parseInt(month, 10), parseInt(day, 10) + 1);
 
 			this.query.ts = {
 				$gte: date,
