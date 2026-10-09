@@ -293,6 +293,27 @@ export class NotificationsModule {
 			});
 		});
 
+		function parseVideoConfAction(data: unknown): { action: string; params: { callId: string; uid: string; rid: string } } | undefined {
+			if (!data || typeof data !== 'object') {
+				return;
+			}
+
+			const { action, params } = data as {
+				action: string | undefined;
+				params: { callId?: string; uid?: string; rid?: string };
+			};
+
+			if (!action || typeof action !== 'string' || !params || typeof params !== 'object') {
+				return;
+			}
+
+			const callId = 'callId' in params && typeof params.callId === 'string' ? params.callId : '';
+			const uid = 'uid' in params && typeof params.uid === 'string' ? params.uid : '';
+			const rid = 'rid' in params && typeof params.rid === 'string' ? params.rid : '';
+
+			return { action, params: { callId, uid, rid } };
+		}
+
 		this.streamRoomUsers.allowRead('none');
 		this.streamRoomUsers.allowWrite(async function (
 			eventName: `${string}/video-conference` | `${string}/userData`,
@@ -300,44 +321,44 @@ export class NotificationsModule {
 		) {
 			const [roomId, e] = eventName.split('/') as [string, 'video-conference' | 'userData'];
 			if (
-				this.userId &&
-				['video-conference', 'userData'].includes(e) &&
-				(await Subscriptions.countByRoomIdAndUserId(roomId, this.userId)) > 0
+				!this.userId ||
+				!['video-conference', 'userData'].includes(e) ||
+				(await Subscriptions.countByRoomIdAndUserId(roomId, this.userId)) === 0
 			) {
-				const subscriptions: ISubscription[] = await Subscriptions.findByRoomIdAndNotUserId(roomId, this.userId, {
-					projection: { 'u._id': 1, '_id': 0 },
-				}).toArray();
-
-				subscriptions.forEach((subscription) => self.notifyUser(subscription.u._id, e, ...args));
+				return false;
 			}
+
+			if (e === 'video-conference') {
+				const videoConfAction = parseVideoConfAction(args[0]);
+				if (
+					videoConfAction?.params.rid !== roomId ||
+					!(await VideoConf.validateAction(videoConfAction.action, this.userId, videoConfAction.params))
+				) {
+					return false;
+				}
+			}
+
+			const subscriptions: ISubscription[] = await Subscriptions.findByRoomIdAndNotUserId(roomId, this.userId, {
+				projection: { 'u._id': 1, '_id': 0 },
+			}).toArray();
+
+			subscriptions.forEach((subscription) => self.notifyUser(subscription.u._id, e, ...args));
 			return false;
 		});
 
 		this.streamUser.allowWrite(async function (eventName, data: unknown) {
 			const [, e] = eventName.split('/');
 			if (e === 'video-conference') {
-				if (!this.userId || !data || typeof data !== 'object') {
+				if (!this.userId) {
 					return false;
 				}
 
-				const { action: videoAction, params } = data as {
-					action: string | undefined;
-					params: { callId?: string; uid?: string; rid?: string };
-				};
-
-				if (!videoAction || typeof videoAction !== 'string' || !params || typeof params !== 'object') {
+				const videoConfAction = parseVideoConfAction(data);
+				if (!videoConfAction) {
 					return false;
 				}
 
-				const callId = 'callId' in params && typeof params.callId === 'string' ? params.callId : '';
-				const uid = 'uid' in params && typeof params.uid === 'string' ? params.uid : '';
-				const rid = 'rid' in params && typeof params.rid === 'string' ? params.rid : '';
-
-				return VideoConf.validateAction(videoAction, this.userId, {
-					callId,
-					uid,
-					rid,
-				});
+				return VideoConf.validateAction(videoConfAction.action, this.userId, videoConfAction.params);
 			}
 
 			if (e === 'media-calls') {

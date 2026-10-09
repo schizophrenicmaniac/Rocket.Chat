@@ -117,6 +117,8 @@ describe('NotificationsModule', () => {
 			);
 
 		beforeEach(() => {
+			validateAction.mockReset();
+			validateAction.mockResolvedValue(true);
 			countByRoomIdAndUserId.mockReset();
 			countByRoomIdAndUserId.mockResolvedValue(1); // attacker is subscribed to the room
 			findByRoomIdAndNotUserId.mockReset();
@@ -149,16 +151,68 @@ describe('NotificationsModule', () => {
 			expect(emitSpy).not.toHaveBeenCalled();
 		});
 
-		['video-conference', 'userData'].forEach((event) => {
-			it(`should relay "${event}" event to other room members`, async () => {
-				const emitSpy = jest.spyOn(notifications.streamUser, 'emit');
+		it('should relay "userData" event to other room members', async () => {
+			const emitSpy = jest.spyOn(notifications.streamUser, 'emit');
 
-				const result = await writeAllowed(`room1/${event}`, { foo: 'bar' });
+			const result = await writeAllowed('room1/userData', { foo: 'bar' });
 
-				expect(result).toBe(false);
-				expect(findByRoomIdAndNotUserId).toHaveBeenCalled();
-				expect(emitSpy).toHaveBeenCalled();
+			expect(result).toBe(false);
+			expect(findByRoomIdAndNotUserId).toHaveBeenCalled();
+			expect(emitSpy).toHaveBeenCalledWith('victim/userData', { foo: 'bar' });
+		});
+
+		it('should relay a "video-conference" event that VideoConf.validateAction accepts', async () => {
+			const emitSpy = jest.spyOn(notifications.streamUser, 'emit');
+			const data = { action: 'call', params: { callId: '123', uid: 'attacker', rid: 'room1' } };
+
+			const result = await writeAllowed('room1/video-conference', data);
+
+			expect(result).toBe(false);
+			expect(validateAction).toHaveBeenCalledTimes(1);
+			expect(validateAction).toHaveBeenCalledWith('call', 'attacker', { callId: '123', uid: 'attacker', rid: 'room1' });
+			expect(emitSpy).toHaveBeenCalledWith('victim/video-conference', data);
+		});
+
+		it('should not relay a "video-conference" event that VideoConf.validateAction rejects', async () => {
+			validateAction.mockResolvedValue(false);
+			const emitSpy = jest.spyOn(notifications.streamUser, 'emit');
+
+			// a forged call: the callId matches no conference
+			const result = await writeAllowed('room1/video-conference', {
+				action: 'call',
+				params: { callId: 'forged', uid: 'admin', rid: 'room1' },
 			});
+
+			expect(result).toBe(false);
+			expect(validateAction).toHaveBeenCalledTimes(1);
+			expect(findByRoomIdAndNotUserId).not.toHaveBeenCalled();
+			expect(emitSpy).not.toHaveBeenCalled();
+		});
+
+		it('should not relay a malformed "video-conference" payload', async () => {
+			const emitSpy = jest.spyOn(notifications.streamUser, 'emit');
+
+			const result = await writeAllowed('room1/video-conference', { foo: 'bar' });
+
+			expect(result).toBe(false);
+			expect(validateAction).not.toHaveBeenCalled();
+			expect(findByRoomIdAndNotUserId).not.toHaveBeenCalled();
+			expect(emitSpy).not.toHaveBeenCalled();
+		});
+
+		it('should not relay a "video-conference" event about a different room', async () => {
+			const emitSpy = jest.spyOn(notifications.streamUser, 'emit');
+
+			// validated against a room the attacker can reach, but delivered to the members of room1
+			const result = await writeAllowed('room1/video-conference', {
+				action: 'call',
+				params: { callId: '123', uid: 'attacker', rid: 'room2' },
+			});
+
+			expect(result).toBe(false);
+			expect(validateAction).not.toHaveBeenCalled();
+			expect(findByRoomIdAndNotUserId).not.toHaveBeenCalled();
+			expect(emitSpy).not.toHaveBeenCalled();
 		});
 	});
 
