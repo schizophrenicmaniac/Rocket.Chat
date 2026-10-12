@@ -62,6 +62,13 @@ describe('native emoji render', () => {
 		expect(render('👍')).toBe('<span class="emoji" title=":thumbsup:">👍</span>');
 	});
 
+	it('renders emoji added in Unicode 17', () => {
+		const { render } = getEmojiConfig(buildEmojiPackages(false));
+
+		expect(render('🫪')).toBe('<span class="emoji" title=":distorted_face:">🫪</span>');
+		expect(render('🧑‍🩰')).toBe('<span class="emoji" title=":ballet_dancer:">🧑‍🩰</span>');
+	});
+
 	it('resolves the VS16-qualified form to the same shortcode', () => {
 		const { render } = getEmojiConfig(buildEmojiPackages(false));
 

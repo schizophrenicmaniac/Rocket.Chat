@@ -21,6 +21,15 @@ const EmojiRenderer = ({ big = false, preview = false, ...emoji }: EmojiProps) =
 		return <PlainSpan text={descriptors?.map(({ name, content }) => name || content).join('') ?? sanitizedFallback} />;
 	}
 
+	// unicode newer than the emoji packages is still an emoji, so it keeps the emoji size
+	const unknownUnicodeEmoji = preview ? (
+		<ThreadMessageEmoji name=''>{sanitizedFallback}</ThreadMessageEmoji>
+	) : (
+		<MessageEmoji big={big} name=''>
+			{sanitizedFallback}
+		</MessageEmoji>
+	);
+
 	return (
 		<>
 			{descriptors?.map(({ name, className, image, content }, i) => (
@@ -37,7 +46,7 @@ const EmojiRenderer = ({ big = false, preview = false, ...emoji }: EmojiProps) =
 				</span>
 			)) ?? (
 				<span title={sanitizedFallback} role='img' aria-label={sanitizedFallback.charAt(0) === ':' ? sanitizedFallback : undefined}>
-					{sanitizedFallback}
+					{'unicode' in emoji ? unknownUnicodeEmoji : sanitizedFallback}
 				</span>
 			)}
 		</>

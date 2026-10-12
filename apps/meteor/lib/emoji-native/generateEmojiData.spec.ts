@@ -83,6 +83,15 @@ describe('native emoji shortcodes', () => {
 		expect(unicodeOf('root_vegetable')).toBe('🫜');
 	});
 
+	it('lists the emoji added in Unicode 17 in the picker', () => {
+		expect(unicodeOf('distorted_face')).toBe('🫪');
+		expect(unicodeOf('orca')).toBe('🫍');
+		expect(unicodeOf('treasure_chest')).toBe('🪎');
+		expect(emojisByCategory.people).toContain('distorted_face');
+		expect(emojisByCategory.nature).toContain('orca');
+		expect(emojisByCategory.objects).toContain('treasure_chest');
+	});
+
 	it('only backfills legacy shortcodes the presets do not provide', () => {
 		// the map is hand-generated; if a preset already names a shortcode, the entry is dead weight
 		// and, worse, hides which name is authoritative

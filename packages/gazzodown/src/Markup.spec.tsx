@@ -427,6 +427,89 @@ describe('unicode emojis with the useEmojis preference disabled', () => {
 	});
 });
 
+describe('unicode emojis the emoji packages do not know', () => {
+	// emoji from a newer Unicode release than the emoji data still reach the client as unicode
+	const detectEmoji = (text: string) => (text === '🪉' ? [{ name: ':harp:', className: 'emoji', content: '🪉' }] : []);
+
+	it('renders them at the same size as known emojis in a big emoji block', () => {
+		render(
+			<MarkupInteractionContext.Provider
+				value={{
+					convertAsciiToEmoji: true,
+					useEmoji: true,
+					detectEmoji,
+				}}
+			>
+				<Markup
+					tokens={[
+						{
+							type: 'BIG_EMOJI',
+							value: [
+								{ type: 'EMOJI', value: undefined, unicode: '🪉' },
+								{ type: 'EMOJI', value: undefined, unicode: '🫪' },
+							],
+						},
+					]}
+				/>
+			</MarkupInteractionContext.Provider>,
+		);
+
+		expect(screen.getByText('🪉')).toHaveClass('rcx-message__emoji', 'rcx-message__emoji--big');
+		expect(screen.getByText('🫪')).toHaveClass('rcx-message__emoji', 'rcx-message__emoji--big');
+	});
+
+	it('renders them as emojis inside a paragraph', () => {
+		render(
+			<MarkupInteractionContext.Provider
+				value={{
+					convertAsciiToEmoji: true,
+					useEmoji: true,
+					detectEmoji,
+				}}
+			>
+				<Markup
+					tokens={[
+						{
+							type: 'PARAGRAPH',
+							value: [
+								{ type: 'PLAIN_TEXT', value: 'Hey! ' },
+								{ type: 'EMOJI', value: undefined, unicode: '🫪' },
+							],
+						},
+					]}
+				/>
+			</MarkupInteractionContext.Provider>,
+		);
+
+		expect(screen.getByText('🫪')).toHaveClass('rcx-message__emoji');
+		expect(screen.getByText('🫪')).not.toHaveClass('rcx-message__emoji--big');
+	});
+
+	it('keeps an unknown shortcode as plain text', () => {
+		render(
+			<MarkupInteractionContext.Provider
+				value={{
+					convertAsciiToEmoji: true,
+					useEmoji: true,
+					detectEmoji,
+				}}
+			>
+				<Markup
+					tokens={[
+						{
+							type: 'BIG_EMOJI',
+							value: [{ type: 'EMOJI', value: { type: 'PLAIN_TEXT', value: 'not_an_emoji' }, shortCode: 'not_an_emoji' }],
+						},
+					]}
+				/>
+			</MarkupInteractionContext.Provider>,
+		);
+
+		expect(screen.getByRole('img', { name: ':not_an_emoji:' })).not.toHaveClass('rcx-message__emoji');
+		expect(screen.getByText(':not_an_emoji:')).not.toHaveClass('rcx-message__emoji--big');
+	});
+});
+
 describe('ImageElement sanitization', () => {
 	it.each([['javascript:alert(1)'], ['JAVASCRIPT:alert(1)'], ['data:text/html,<script>alert(1)</script>'], ['vbscript:msgbox(1)']])(
 		'replaces dangerous %s scheme with "#" in image href and src',
